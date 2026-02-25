@@ -1476,7 +1476,184 @@ function removeLang(sectionId, lang) {
   setActiveTab(sectionId);
 }
 
+// ─── SAVE CONFIGURATION ───────────────────────────────────
+function saveConfiguration() {
+  const data = collectData();
+  if (!data.general.name) { alert('Please enter an Assessment Name before saving.'); return; }
+  let pruned = 0;
+  sections.forEach(s => {
+    const rows = questionRows[s.id] || [];
+    rows.forEach(r => {
+      DIFFS.forEach(diff => {
+        if (r.diffs[diff] !== undefined && !(r.diffs[diff].numq > 0)) {
+          delete r.diffs[diff]; pruned++;
+        }
+      });
+    });
+    questionRows[s.id] = rows.filter(r => Object.keys(r.diffs).length > 0);
+    if (questionRows[s.id].length === 0) questionRows[s.id] = [newQRow()];
+    renderQRows(s.id);
+  });
+  alert(pruned > 0 ? `Saved. ${pruned} zero-entry difficulty row${pruned>1?'s':''} removed.` : 'Configuration saved.');
+}
 
+// ─── COLLECT FORM DATA ────────────────────────────────────
+function collectData() {
+  const getLabel = (text) => {
+    for (const l of document.querySelectorAll('.field label')) {
+      if (l.textContent.trim() === text) {
+        const inp = l.parentElement.querySelector('input,select');
+        return inp ? inp.value.trim() : '';
+      }
+    }
+    return '';
+  };
+  const general = {
+    name:      getLabel('Name of Assessment'),
+    org:       getLabel('Organization Name'),
+    logo:      getLabel('Organization Logo URL'),
+    startDate: document.querySelectorAll('input[type=datetime-local]')[0]?.value || '',
+    endDate:   document.querySelectorAll('input[type=datetime-local]')[1]?.value || '',
+  };
+  const advanced = {
+    tabSwitch:  document.querySelector('input[name=tab_switch]:checked')?.nextElementSibling?.textContent?.trim() || 'No',
+    proctoring: document.querySelector('input[name=proctoring]:checked')?.nextElementSibling?.textContent?.trim() || 'On',
+  };
+  const sectionData = sections.map(s => {
+    const timeEl = document.getElementById(`s${s.id}_time`);
+    const rows = (questionRows[s.id] || []).map(r => ({
+      lib: r.lib, topic: r.topic, subtopic: r.subtopic, tags: r.tags,
+      diffs: Object.entries(r.diffs).map(([diff, v]) => ({ diff, numq: v.numq, marks: v.marks }))
+    }));
+    return { name: s.name, type: s.type, time: timeEl?.value || '', rows, langs: s.langs || [] };
+  });
+  return { general, advanced, sections: sectionData };
+}
+
+// ─── GENERATE OUTPUT HTML ─────────────────────────────────
+function generateOutputHTML(data) {
+  const TYPE_COLORS = {
+    Coding:'#087f5b', MCQ:'#3b5bdb', SQL:'#c2255c', WebCoding:'#1864ab', IDECoding:'#6741d9'
+  };
+  const DIFF_COLORS = {
+    Easy:  {bg:'#edf7f1',color:'#1a6b3a'},
+    Medium:{bg:'#fdf7ed',color:'#8a5c00'},
+    Hard:  {bg:'#fdf0f0',color:'#9b1515'}
+  };
+  const fmt = v => v || '—';
+
+  const sectionsHTML = data.sections.map((s, i) => {
+    const hc = TYPE_COLORS[s.type] || '#2c2c2c';
+    const rowsHTML = s.rows.map(r => {
+      return r.diffs.map((d, di) => {
+        const dc = DIFF_COLORS[d.diff] || {bg:'#f5f3ee', color:'#333'};
+        const shared = di === 0 ? `
+          <td rowspan="${r.diffs.length}" style="padding:8px 12px;border:1px solid #e0ddd8;vertical-align:middle;font-size:13px;">${fmt(r.lib)}</td>
+          <td rowspan="${r.diffs.length}" style="padding:8px 12px;border:1px solid #e0ddd8;vertical-align:middle;font-size:13px;">${fmt(r.topic)}</td>
+          <td rowspan="${r.diffs.length}" style="padding:8px 12px;border:1px solid #e0ddd8;vertical-align:middle;font-size:13px;">${fmt(r.subtopic)}</td>` : '';
+        const tagsCell = di === 0 ? `<td rowspan="${r.diffs.length}" style="padding:8px 12px;border:1px solid #e0ddd8;vertical-align:middle;">${
+          r.tags && r.tags.length ? r.tags.map(t=>`<span style="background:#edf7f1;border:1px solid #1a6b3a;color:#1a472a;font-size:10px;padding:2px 7px;border-radius:2px;font-weight:600;">${t}</span>`).join(' ') : '—'
+        }</td>` : '';
+        return `<tr>
+          ${shared}
+          <td style="padding:8px 12px;border:1px solid #e0ddd8;background:${dc.bg};color:${dc.color};font-weight:700;font-size:11px;letter-spacing:.04em;border-left:3px solid ${dc.color};">${d.diff}</td>
+          ${tagsCell}
+          <td style="padding:8px 12px;border:1px solid #e0ddd8;text-align:center;font-size:13px;">${d.numq}</td>
+          <td style="padding:8px 12px;border:1px solid #e0ddd8;text-align:center;font-size:13px;">${d.marks}</td>
+        </tr>`;
+      }).join('');
+    }).join('');
+
+    const langsHTML = s.langs && s.langs.length ? `
+      <div style="padding:12px 20px;border-top:1px solid #e0ddd8;background:#fafaf8;">
+        <span style="font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.1em;color:#6b6560;text-transform:uppercase;">Languages</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${s.langs.map((l,i)=>`<span style="background:${i===0?'#1a472a':'#edf7f1'};color:${i===0?'#fff':'#1a472a'};border:1.5px solid #1a472a;padding:3px 10px;font-family:monospace;font-size:11px;font-weight:600;border-radius:2px;">${i===0?'DEFAULT · ':''} ${l}</span>`).join('')}
+        </div>
+      </div>` : '';
+
+    return `
+    <div style="border:2px solid #2c2c2c;margin-bottom:24px;">
+      <div style="background:${hc};color:#fff;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:monospace;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Section ${i+1}: ${s.name}</span>
+        <span style="background:rgba(255,255,255,.15);color:#fff;font-family:monospace;font-size:9px;font-weight:700;padding:2px 10px;">${s.type}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e0ddd8;">
+        <div style="padding:10px 16px;border-right:1px solid #e0ddd8;">
+          <div style="font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.1em;color:#6b6560;text-transform:uppercase;margin-bottom:4px;">Time Limit</div>
+          <div style="font-size:14px;">${fmt(s.time)} mins</div>
+        </div>
+        <div style="padding:10px 16px;">
+          <div style="font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.1em;color:#6b6560;text-transform:uppercase;margin-bottom:4px;">Type</div>
+          <div style="font-size:14px;">${s.type}</div>
+        </div>
+      </div>
+      <div style="background:#2c2c2c;color:#f5f3ee;padding:7px 16px;font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;">Question Combinations</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-family:sans-serif;">
+          <thead>
+            <tr style="background:#f0ede7;">
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:left;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Library</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:left;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Topic</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:left;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Sub Topic</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:left;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Difficulty</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:left;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Tags</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:center;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Questions</th>
+              <th style="padding:8px 12px;border:1px solid #e0ddd8;text-align:center;font-family:monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6b6560;">Marks/Q</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHTML}</tbody>
+        </table>
+      </div>
+      ${langsHTML}
+    </div>`;
+  }).join('');
+
+  const now = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${data.general.name} — Topin Assessment Config</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'IBM Plex Sans',sans-serif;background:#f5f3ee;color:#1a1a1a;padding:40px 20px 80px;}
+  .page{max-width:900px;margin:0 auto;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="border:2px solid #2c2c2c;background:#fff;padding:24px 32px;margin-bottom:28px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b6560;margin-bottom:6px;">topin.tech</div>
+    <h1 style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.02em;">${fmt(data.general.name)}</h1>
+    <div style="margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Org: <strong style="color:#1a1a1a;">${fmt(data.general.org)}</strong></span>
+      ${data.general.startDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Start: <strong style="color:#1a1a1a;">${data.general.startDate.replace('T',' ')}</strong></span>` : ''}
+      ${data.general.endDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">End: <strong style="color:#1a1a1a;">${data.general.endDate.replace('T',' ')}</strong></span>` : ''}
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Published: <strong style="color:#1a1a1a;">${now}</strong></span>
+    </div>
+  </div>
+  <div style="border:2px solid #2c2c2c;background:#fff;margin-bottom:28px;">
+    <div style="background:#2c2c2c;color:#f5f3ee;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;padding:10px 20px;">Advanced Options</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;">
+      <div style="padding:12px 20px;border-right:1px solid #e0ddd8;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.1em;color:#6b6560;text-transform:uppercase;margin-bottom:4px;">Tab Switch Allowed</div>
+        <div style="font-size:14px;font-weight:600;color:${data.advanced.tabSwitch==='Yes'?'#1a6b3a':'#9b1515'};">${data.advanced.tabSwitch}</div>
+      </div>
+      <div style="padding:12px 20px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.1em;color:#6b6560;text-transform:uppercase;margin-bottom:4px;">Proctoring</div>
+        <div style="font-size:14px;font-weight:600;color:${data.advanced.proctoring==='On'?'#1a6b3a':'#9b1515'};">${data.advanced.proctoring}</div>
+      </div>
+    </div>
+  </div>
+  ${sectionsHTML}
+</div>
+</body>
+</html>`;
+}
 
 // ─── DOWNLOAD CONFIG ─────────────────────────────────────
 function downloadConfig() {
