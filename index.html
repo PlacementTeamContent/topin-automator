@@ -1638,7 +1638,11 @@ function saveConfiguration() {
 function collectData() {
   const getLabel = (text) => {
     for (const l of document.querySelectorAll('.field label')) {
-      if (l.textContent.trim() === text) {
+      const labelText = Array.from(l.childNodes)
+        .filter(n => n.nodeType === Node.TEXT_NODE)
+        .map(n => n.textContent)
+        .join('').trim();
+      if (labelText === text) {
         const inp = l.parentElement.querySelector('input,select');
         return inp ? inp.value.trim() : '';
       }
