@@ -938,7 +938,7 @@
   <!-- ACTIONS -->
   <div class="actions">
     <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
-    <button class="btn btn-publish" onclick="publishToNetlify()">⬆ Publish</button>
+    <button class="btn btn-primary" onclick="downloadConfiguration()">&#8659; Download</button>
     <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
   </div>
 
@@ -1678,6 +1678,20 @@ function generateOutputHTML(data) {
 </div>
 </body>
 </html>`;
+}
+
+// ─── DOWNLOAD CONFIGURATION ───────────────────────────────
+function downloadConfiguration() {
+  const data = collectData();
+  if (!data.general.name) { alert('Please enter an Assessment Name before downloading.'); return; }
+  const html = generateOutputHTML(data);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = (data.general.name.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'assessment') + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── PUBLISH TO NETLIFY ───────────────────────────────────
