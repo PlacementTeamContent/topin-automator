@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Assessment Configuration Template</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root {
     --bg: #f5f3ee;
@@ -836,6 +837,45 @@
   .btn-danger:hover { background: #c73512; }
   .btn-publish   { background: #6741d9; color: #fff; border-color: #6741d9; }
   .btn-publish:hover { background: #5433b0; }
+
+  /* ── REQUIRED STAR ── */
+  .req-star { color: var(--accent2); }
+
+  /* ── CUSTOM 12-HOUR DATETIME PICKER ── */
+  .dt-picker {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 3px;
+  }
+  .field .dt-picker input[type=date] {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    padding: 4px 2px;
+    font-size: 13px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+  }
+  .field .dt-picker input[type=date]:focus { background: transparent; box-shadow: none; }
+  .field .dt-picker select {
+    border: none;
+    outline: none;
+    background: transparent !important;
+    background-image: none !important;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 4px 2px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: auto;
+  }
+  .dt-sep { width: 1px; height: 16px; background: var(--border-light); margin: 0 8px; flex-shrink: 0; }
+  .dt-colon { font-size: 13px; color: var(--text-muted); margin: 0 1px; }
 </style>
 </head>
 <body>
@@ -859,7 +899,7 @@
       <div class="two-col-grid">
         <div class="grid-cell">
           <div class="field">
-            <label>Name of Assessment</label>
+            <label>Name of Assessment <span class="req-star">*</span></label>
             <input type="text" placeholder="e.g. Backend Engineer Round 1">
           </div>
         </div>
@@ -871,14 +911,34 @@
         </div>
         <div class="grid-cell">
           <div class="field">
-            <label>Start Date &amp; Time</label>
-            <input type="datetime-local">
+            <label>Start Date &amp; Time <span class="req-star">*</span></label>
+            <div class="dt-picker">
+              <input type="date" id="genStartDate">
+              <span class="dt-sep"></span>
+              <select id="genStartHour" class="dt-sel-hour"></select>
+              <span class="dt-colon">:</span>
+              <select id="genStartMin" class="dt-sel-min"></select>
+              <select id="genStartAmpm">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="grid-cell">
           <div class="field">
-            <label>End Date &amp; Time</label>
-            <input type="datetime-local">
+            <label>End Date &amp; Time <span class="req-star">*</span></label>
+            <div class="dt-picker">
+              <input type="date" id="genEndDate">
+              <span class="dt-sep"></span>
+              <select id="genEndHour" class="dt-sel-hour"></select>
+              <span class="dt-colon">:</span>
+              <select id="genEndMin" class="dt-sel-min"></select>
+              <select id="genEndAmpm">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="grid-cell" style="grid-column: span 2;">
@@ -937,11 +997,35 @@
   <!-- ACTIONS -->
   <div class="actions">
     <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
-    <button class="btn btn-publish" onclick="downloadConfig()">⬇ Download</button>
+    <button class="btn btn-primary" onclick="downloadConfiguration()">&#8659; Download</button>
     <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
   </div>
 
+  <!-- PUBLISH RESULT POPUP -->
+  <div id="publishResult" style="display:none;margin-top:16px;padding:16px 20px;border:2px solid #6741d9;background:#f8f5ff;font-family:var(--mono);font-size:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span id="publishStatus" style="color:#6741d9;font-weight:600;letter-spacing:.06em;text-transform:uppercase;"></span>
+      <a id="publishUrl" href="" target="_blank" style="display:none;color:#1a472a;font-weight:600;word-break:break-all;text-decoration:underline;"></a>
+      <button id="copyUrlBtn" onclick="copyPublishUrl()" style="display:none;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:6px 14px;border:2px solid #6741d9;background:transparent;color:#6741d9;cursor:pointer;">Copy URL</button>
+    </div>
+  </div>
+
 </div><!-- /page -->
+
+<!-- ── NETLIFY TOKEN MODAL ── -->
+<div id="netlifyTokenModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border:2px solid var(--border);padding:0;width:480px;max-width:95%;">
+    <div style="background:var(--label-bg);color:var(--label-fg);font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:12px 20px;">Netlify Personal Access Token</div>
+    <div style="padding:20px;">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">Required once to publish directly to Netlify. Saved locally in your browser.<br>Get yours at: <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" style="color:#6741d9;">app.netlify.com → User settings → Personal access tokens</a></p>
+      <input id="netlifyTokenInput" type="password" placeholder="Paste your Netlify token here..." style="width:100%;font-family:var(--mono);font-size:12px;padding:10px 12px;border:2px solid var(--border-light);outline:none;margin-bottom:16px;" onkeydown="if(event.key==='Enter')saveNetlifyToken()">
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('netlifyTokenModal').style.display='none'" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:10px 20px;border:2px solid var(--border);background:transparent;cursor:pointer;">Cancel</button>
+        <button onclick="saveNetlifyToken()" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:10px 20px;border:2px solid #6741d9;background:#6741d9;color:#fff;cursor:pointer;">Save & Publish</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── ADD SECTION MODAL ── -->
 <div id="addModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;">
@@ -992,10 +1076,48 @@ let activeTab = null;
 let pendingType = null;
 let sectionCounter = 0;
 
+const ALL_LANGS = ['Python', 'C++', 'JavaScript', 'Java', 'C', 'C#', 'Go', 'Ruby', 'Swift', 'Kotlin'];
+
 // ─── INIT ─────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // no default sections — user adds via "+ Add Section"
+  initDatetimePickers();
 });
+
+function initDatetimePickers() {
+  const hourOpts = [12,1,2,3,4,5,6,7,8,9,10,11]
+    .map(h => `<option value="${h}">${h}</option>`).join('');
+  const minOpts = Array.from({length:60}, (_,i) => {
+    const m = String(i).padStart(2,'0');
+    return `<option value="${m}">${m}</option>`;
+  }).join('');
+  document.querySelectorAll('.dt-sel-hour').forEach(el => el.innerHTML = hourOpts);
+  document.querySelectorAll('.dt-sel-min').forEach(el => el.innerHTML = minOpts);
+}
+
+function getDatetime(prefix) {
+  const date = document.getElementById(prefix + 'Date')?.value || '';
+  if (!date) return '';
+  const hour = document.getElementById(prefix + 'Hour')?.value || '12';
+  const min  = document.getElementById(prefix + 'Min')?.value || '00';
+  const ampm = document.getElementById(prefix + 'Ampm')?.value || 'AM';
+  let h = parseInt(hour, 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return `${date}T${String(h).padStart(2,'0')}:${min}`;
+}
+
+function fmtDt(dtStr) {
+  if (!dtStr) return '';
+  try {
+    const [datePart, timePart] = dtStr.split('T');
+    const [y, mo, d] = datePart.split('-').map(Number);
+    const [hh, mm]   = timePart.split(':').map(Number);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const ampm   = hh >= 12 ? 'PM' : 'AM';
+    const h12    = hh % 12 || 12;
+    return `${months[mo-1]} ${d}, ${y} · ${h12}:${String(mm).padStart(2,'0')} ${ampm}`;
+  } catch(e) { return dtStr; }
+}
 
 // ─── COLLAPSIBLE BLOCKS ───────────────────────────────────
 function toggleAdv() { toggleBlock('advBody', 'advChevron'); }
@@ -1038,13 +1160,17 @@ function confirmAddSection() {
     SQL: 'SQL Coding', WebCoding: 'Web Coding', IDECoding: 'IDE Coding'
   };
   const name = document.getElementById('newSectionName').value.trim() || defaultNames[pendingType];
+  if (sections.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+    alert(`A section named "${name}" already exists. Please use a different name.`);
+    return;
+  }
   closeModal();
   createSection(pendingType, name);
 }
 
 function createSection(type, name) {
   const id = ++sectionCounter;
-  const section = { id, name, type, langs: type === 'Coding' ? ['Python','C++','Java'] : [] };
+  const section = { id, name, type, time: '', langs: type === 'Coding' ? ['Python','C++','JavaScript','Java'] : [] };
   sections.push(section);
   // init one blank question row
   if (!questionRows[id]) questionRows[id] = [newQRow()];
@@ -1087,7 +1213,7 @@ function renderTabs() {
       ondragend="dragEnd(event)"
       onclick="setActiveTab(${s.id})">
       <span class="drag-handle" title="Drag to reorder">⠿</span>
-      <span>${s.name}</span>
+      <span id="tabName_${s.id}">${s.name}</span>
       <span class="tab-type-pill ${pillClass[s.type]||'pill-mcq'}">${pillLabel[s.type]||s.type}</span>
       <span class="remove-tab" onclick="event.stopPropagation();removeSection(${s.id})">✕</span>
     </div>`).join('');
@@ -1145,12 +1271,13 @@ function metaFields(s) {
       <div class="field">
         <label>Name of Section</label>
         <input type="text" value="${s.name}" oninput="updateSectionName(${s.id},this.value)" placeholder="e.g. ${s.name}">
+        <div id="nameErr_${s.id}" style="display:none;font-size:11px;color:var(--accent2);padding:2px 16px 6px;font-family:var(--mono);">Name already used by another section</div>
       </div>
     </div>
     <div class="grid-cell">
       <div class="field">
         <label>Time Limit (Mins)</label>
-        <input type="number" min="1" placeholder="e.g. 30" id="s${s.id}_time">
+        <input type="number" min="1" placeholder="e.g. 30" id="s${s.id}_time" value="${s.time || ''}" oninput="updateSectionTime(${s.id},this.value)">
       </div>
     </div>
   </div>`;
@@ -1188,8 +1315,7 @@ function qRowsTable(s) {
 
 // ─── CODING PANEL ─────────────────────────────────────────
 function codingPanel(s) {
-  const optionalLangs = ['JavaScript', 'C', 'C#'];
-  const available = optionalLangs.filter(l => !s.langs.includes(l));
+  const available = ALL_LANGS.filter(l => !s.langs.includes(l));
   return `
   <div class="section-panel ${activeTab===s.id?'active':''}" data-id="${s.id}">
     <div class="section-panel-header" style="background:#087f5b;">
@@ -1436,15 +1562,26 @@ function restoreQRows() {
 
 function updateSectionName(id, val) {
   const sec = sections.find(s => s.id === id);
-  if (sec) {
-    const defaults = {
-      Coding: 'Coding Section', MCQ: 'Technical MCQs',
-      SQL: 'SQL Coding', WebCoding: 'Web Coding', IDECoding: 'IDE Coding'
-    };
-    sec.name = val || defaults[sec.type] || 'Section';
-    const tab = document.querySelector(`.section-tab[data-id="${id}"] span:first-child`);
-    if (tab) tab.textContent = sec.name;
-  }
+  if (!sec) return;
+  const defaults = {
+    Coding: 'Coding Section', MCQ: 'Technical MCQs',
+    SQL: 'SQL Coding', WebCoding: 'Web Coding', IDECoding: 'IDE Coding'
+  };
+  const newName = val.trim() || defaults[sec.type] || 'Section';
+  const isDupe = val.trim() !== '' && sections.some(s => s.id !== id && s.name.toLowerCase() === val.trim().toLowerCase());
+  sec._nameDuplicate = isDupe;
+  sec.name = newName;
+  const errEl = document.getElementById('nameErr_' + id);
+  if (errEl) errEl.style.display = isDupe ? 'block' : 'none';
+  const inputEl = document.querySelector(`.section-panel[data-id="${id}"] .section-meta input[type=text]`);
+  if (inputEl) inputEl.style.boxShadow = isDupe ? 'inset 3px 0 0 var(--accent2)' : '';
+  const tab = document.getElementById('tabName_' + id);
+  if (tab) tab.textContent = sec.name;
+}
+
+function updateSectionTime(id, val) {
+  const sec = sections.find(s => s.id === id);
+  if (sec) sec.time = val;
 }
 
 // ─── LANGUAGE MANAGEMENT ─────────────────────────────────
@@ -1512,8 +1649,8 @@ function collectData() {
     name:      getLabel('Name of Assessment'),
     org:       getLabel('Organization Name'),
     logo:      getLabel('Organization Logo URL'),
-    startDate: document.querySelectorAll('input[type=datetime-local]')[0]?.value || '',
-    endDate:   document.querySelectorAll('input[type=datetime-local]')[1]?.value || '',
+    startDate: getDatetime('genStart'),
+    endDate:   getDatetime('genEnd'),
   };
   const advanced = {
     tabSwitch:  document.querySelector('input[name=tab_switch]:checked')?.nextElementSibling?.textContent?.trim() || 'No',
@@ -1631,8 +1768,8 @@ function generateOutputHTML(data) {
     <h1 style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.02em;">${fmt(data.general.name)}</h1>
     <div style="margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;">
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Org: <strong style="color:#1a1a1a;">${fmt(data.general.org)}</strong></span>
-      ${data.general.startDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Start: <strong style="color:#1a1a1a;">${data.general.startDate.replace('T',' ')}</strong></span>` : ''}
-      ${data.general.endDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">End: <strong style="color:#1a1a1a;">${data.general.endDate.replace('T',' ')}</strong></span>` : ''}
+      ${data.general.startDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Start: <strong style="color:#1a1a1a;">${fmtDt(data.general.startDate)}</strong></span>` : ''}
+      ${data.general.endDate ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">End: <strong style="color:#1a1a1a;">${fmtDt(data.general.endDate)}</strong></span>` : ''}
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b6560;">Published: <strong style="color:#1a1a1a;">${now}</strong></span>
     </div>
   </div>
@@ -1655,29 +1792,149 @@ function generateOutputHTML(data) {
 </html>`;
 }
 
-// ─── DOWNLOAD CONFIG ─────────────────────────────────────
-function downloadConfig() {
+// ─── DOWNLOAD CONFIGURATION ───────────────────────────────
+function downloadConfiguration() {
   const data = collectData();
-  if (!data.general.name) {
-    alert('Please enter an Assessment Name before downloading.');
+  const errs = [];
+  if (!data.general.name)      errs.push('Name of Assessment');
+  if (!data.general.startDate) errs.push('Start Date & Time');
+  if (!data.general.endDate)   errs.push('End Date & Time');
+  if (errs.length) {
+    alert('Please fill in the required field(s):\n\n• ' + errs.join('\n• '));
+    return;
+  }
+  const dupSection = sections.find(s => s._nameDuplicate);
+  if (dupSection) {
+    alert(`Section "${dupSection.name}" has a duplicate name. Please rename it before downloading.`);
     return;
   }
   const html = generateOutputHTML(data);
-  const slug = data.general.name.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 60) || 'assessment';
-  const filename = slug + '-config.html';
   const blob = new Blob([html], { type: 'text/html' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = (data.general.name.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'assessment') + '.html';
   a.click();
-  URL.revokeObjectURL(a.href);
+  URL.revokeObjectURL(url);
+}
+
+// ─── PUBLISH TO NETLIFY ───────────────────────────────────
+async function publishToNetlify() {
+  const data = collectData();
+  if (!data.general.name) {
+    alert('Please enter an Assessment Name before publishing.');
+    return;
+  }
+  const token = localStorage.getItem('netlify_token');
+  if (!token) {
+    document.getElementById('netlifyTokenModal').style.display = 'flex';
+    return;
+  }
+  await doPublish(token, data);
+}
+
+async function doPublish(token, data) {
+  const resultDiv = document.getElementById('publishResult');
+  const statusEl  = document.getElementById('publishStatus');
+  const urlEl     = document.getElementById('publishUrl');
+  const copyBtn   = document.getElementById('copyUrlBtn');
+
+  resultDiv.style.display = 'block';
+  urlEl.style.display = 'none';
+  copyBtn.style.display = 'none';
+  statusEl.textContent = 'Generating HTML...';
+
+  try {
+    const html = generateOutputHTML(data);
+    const slug = data.general.name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 40) || 'assessment';
+
+    statusEl.textContent = 'Packaging...';
+    const zip = new JSZip();
+    zip.file('index.html', html);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    statusEl.textContent = 'Creating Netlify site...';
+    const siteName = slug + '-' + Date.now().toString(36);
+    const siteRes = await fetch('https://api.netlify.com/api/v1/sites', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name: siteName })
+    });
+
+    if (siteRes.status === 401) {
+      localStorage.removeItem('netlify_token');
+      statusEl.textContent = 'Invalid token — please re-enter.';
+      setTimeout(() => { document.getElementById('netlifyTokenModal').style.display = 'flex'; }, 1200);
+      return;
+    }
+    if (!siteRes.ok) throw new Error(`Site creation failed (${siteRes.status})`);
+    const site = await siteRes.json();
+
+    statusEl.textContent = 'Deploying...';
+    const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${site.id}/deploys`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/zip'
+      },
+      body: zipBlob
+    });
+    if (!deployRes.ok) throw new Error(`Deploy failed (${deployRes.status})`);
+    const deploy = await deployRes.json();
+
+    statusEl.textContent = 'Processing...';
+    const liveUrl = await pollDeployReady(token, deploy.id);
+
+    statusEl.textContent = 'Published!';
+    urlEl.href = liveUrl;
+    urlEl.textContent = liveUrl;
+    urlEl.style.display = 'inline';
+    copyBtn.style.display = 'inline-block';
+
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+  }
+}
+
+async function pollDeployReady(token, deployId) {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const res = await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const d = await res.json();
+    if (d.state === 'ready') return d.ssl_url || d.deploy_ssl_url;
+    if (d.state === 'error') throw new Error('Deploy failed on Netlify');
+  }
+  throw new Error('Deploy timed out — check your Netlify dashboard');
+}
+
+function saveNetlifyToken() {
+  const token = document.getElementById('netlifyTokenInput').value.trim();
+  if (!token) return;
+  localStorage.setItem('netlify_token', token);
+  document.getElementById('netlifyTokenModal').style.display = 'none';
+  const data = collectData();
+  doPublish(token, data);
+}
+
+function copyPublishUrl() {
+  const url = document.getElementById('publishUrl').href;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyUrlBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy URL'; }, 2000);
+  });
 }
 
 // ─── CLEAR ALL ────────────────────────────────────────────
 function clearAll() {
   if (!confirm('Clear all fields?')) return;
-  document.querySelectorAll('input[type=text], input[type=url], input[type=number], input[type=datetime-local], textarea').forEach(el => {
+  document.querySelectorAll('input[type=text], input[type=url], input[type=number], input[type=date], textarea').forEach(el => {
     if (el.min === '2') el.value = '3'; // keep inactivity default
     else el.value = '';
   });
